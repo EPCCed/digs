@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSPY v5 U (http://www.xmlspy.com) by Chris Maynard (University of Edinburgh) -->
+<gaugeConfiguration xmlns="http://www.lqcd.org/ildg/QCDml/config1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.lqcd.org/ildg/QCDml/config1.1 http://www.ph.ed.ac.uk/ukqcd/community/the_grid/QCDml1.1/QCDml1.1Config.xsd">
+	<management>
+		<revisions>1</revisions>
+		<crcCheckSum>           
+                   2632843688
+                </crcCheckSum>
+		<archiveHistory>
+			<elem>
+				<revision>0</revision>
+				<revisionAction>generate</revisionAction>
+				<participant>
+					<name>Chris Maynard</name>
+					<institution>Edinburgh</institution>
+				</participant>
+				<date>1998-04-24T10:25:52Z</date>
+			</elem>
+			<elem>
+				<revision>1</revision>
+				<revisionAction>add</revisionAction>
+				<participant>
+					<name>Chris Maynard</name>
+					<institution>University of Edinburgh</institution>
+				</participant>
+				<date>2002-04-24T10:25:52Z</date>
+			</elem>
+		</archiveHistory>
+	</management>
+	<implementation>
+		<machine>
+			<name>T3E-900</name>
+			<institution>epcc Edinburgh</institution>
+			<machineType>Alpha processor</machineType>
+		</machine>
+		<code>
+			<name>UKQCD FORTRAN</name>
+			<version>16.8.3.1</version>
+			<date>1997-04-04T16:20:10Z</date>
+		</code>
+	</implementation>
+	<algorithm>
+		<parameters>
+			<name>targetResidue</name>
+			<value>1e-07</value>
+		</parameters>
+	</algorithm>
+	<precision>single</precision>
+	<markovStep>
+		<markovChainURI>http://www.lqcd.org/ildg/ukqcd/ukqcd1</markovChainURI>
+		<series>1</series>
+		<update>010170</update>
+		<avePlaquette>0.53380336E+00</avePlaquette>
+		<dataLFN>NF2/BETA52/CLOVER202/V16X32/KAPPA3565/GAUGE/D52C202K3565U029370.tar</dataLFN>
+	</markovStep>
+</gaugeConfiguration>

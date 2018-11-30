@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+
+<project name="QCDgrid" default="Main Build">
+<!-- 
+   Build file for the QCDgrid Java components.
+   Compiles
+  -->	
+	
+	<property name="workDir" location="work"/>
+	<property name="src" location="${workDir}/src" />
+	<property name="bin" location="${workDir}/bin" />
+	<property name="lib" location="${bin}/lib" />
+	<property name="qcdgridjarfile" location="${lib}/QCDgrid.jar" />
+	<property name="wsjarfile" location="${lib}/QCDgridWebServices.jar" />
+	<property name="testjarfile" location="${lib}/QCDgridTest.jar" />
+		
+	
+
+	<!-- Creates a working directory for the compile and takes
+	     a copy of the source -->
+	<target name="Initialise">
+		<delete dir="${workDir}"/>
+		<mkdir dir="${workDir}"/>
+		<mkdir dir="${src}"/>
+		<mkdir dir="${bin}"/>
+		<mkdir dir="${lib}" />
+		<copy todir="${src}">
+			<fileset dir="." includes="**/*.java"/>
+		</copy>
+	</target>
+
+	<!-- Straight compile of all classes -->
+	<target name="Compile" depends="Initialise">
+		<javac srcdir="${src}" destdir="${bin}" source="1.4" target="1.4"/>
+	</target>
+
+	<!-- Jar all classes together -->
+	<target name="Jar" depends="Initialise, Compile">
+		<!--Can remove test/** from release-->
+		<jar destfile="${qcdgridjarfile}" basedir="${bin}" includes="uk/**" />
+		<jar destfile="${wsjarfile}" basedir="${bin}" includes="org/**" />
+		<jar destfile="${testjarfile}" basedir="${bin}" includes="test/**"/>
+	</target>
+	
+	<!-- Create/update Java stubbs for service (server side) -->
+	<target name="CreateMDWSJavaServerStubsFromWSDL">  
+	   <axis-wsdl2java output=".." testcase="true"
+	      serverside="true"
+	      url="ILDG_MDC.wsdl">
+	   </axis-wsdl2java>	   
+	</target>
+	
+	<!-- Create both Jars -->
+	<target name="Main Build" depends="Initialise, Compile, Jar">
+		<echo message="Done. QCDgrid.jar, QCDgridWebServices.jar, QCDgridTest.jar in work/bin/lib directory" />
+	</target>
+
+</project>
+

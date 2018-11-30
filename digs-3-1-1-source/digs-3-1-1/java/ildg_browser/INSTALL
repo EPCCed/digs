@@ -1,0 +1,34 @@
+
+How to install the ILDG metadata client browser.
+================================================
+
+Daragh Byrne 18-08-2006
+
+1. Unzip and untar the distribution.
+2. Change to the ildgbrowser directory.
+3. Edit the setenv.sh (setenv.bat on Windows) script so that the
+   value of the BROWSER_HOME variable to point to
+   $INSTALL_DIR/ildgbrowser.
+   For example, if you unzipped the distribution in /opt/qcdgid,
+   BROWSER_HOME should be /opt/qcdgrid/ildgbrowser.
+4. Source the setenv.sh script (or run setenv.bat on Windows)
+5. Edit the browser.properties file to add the password 
+   required for the browser central data repository. This is
+   available from the UKQCD team.
+6. Obtain a copy of the Services.xml file. This is usually 
+   available from: 
+   http://www.lqcd.org/ildg/Services.xml
+   Edit this so it contains details of the services you wish to
+   search. 
+7. Edit the browser.properties file so that the 
+   services.file.location property points to the services file
+   location.
+8. Optionally, you can configure the operation of the browser
+   by setting the queryrunner.maxresults property value. This
+   determines whether queries are issued against each service
+   in on large query (value = 0 or less), or in a batch of 
+   subqueries, each returning this number of results. This can
+   be useful when issuing queries that return a large number 
+   of results.
+9. Run the browser using the rungui.sh (or, on Windows, rungui.bat)
+   script. Full instructions are available in the user manual.

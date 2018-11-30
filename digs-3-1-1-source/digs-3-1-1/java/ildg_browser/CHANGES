@@ -1,0 +1,8 @@
+New in v1.6
+===========
+
+- eXist 1.1 support
+- raw text query support fixed
+- several query editing fixes
+- several robustness fixes
+- minor bug fixes

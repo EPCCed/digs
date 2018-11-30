@@ -1,0 +1,70 @@
+Instructions for installing DiGS-v2.0 (with ILDG browser)
+
+untar DiGS-v2.0-src.tar
+cd DiGS-v2.0-src
+
+edit Makefile 
+  - set up correct $GLOBUS_LOCATION and $GLOBUS_RLS_LOCATION
+
+set up PATH
+  - source $GLOBUS_LOCATION/etc/globus-user-env.sh
+  - source $GLOBUS_LOCATION/etc/globus-devel-env.sh
+  (and if installed with VDT)
+  - source $VDT_LOCATION/setup.sh
+  - export $QCDGRID_HOME to point to the installation directory (export QCDGRID_HOME=`pwd`)
+
+building client
+  - make client
+  - cd java
+  - edit $BROWSER_HOME in java/ildg-browser/setClasspath.sh to point to ildg-browser directory
+  - source ildg-browser/setenv.sh
+  - ./compile.sh
+
+  - copy nodes.conf and nodeprefs.conf from previous installation of qcdgrid/DiGS
+
+building storage node
+  - make storagenode
+
+  - set up data storage directories (as in previous installation of qcdgrid/DiGS)
+
+building server
+  - make server
+
+  - copy qcdgrid.conf, mainnodelist.conf, deadnodes.conf, disablednodes.conf and retiringnodes.conf from the old installation
+
+
+setup the system for ILDG users (only necessary for storage nodes and the control node)
+  - cd tools/setupFiles
+
+  first set up the $QCDGRID_PATH variable in the file changePermissions.pl
+  then do the following as root:
+  set up the appropriate permissions on files
+  - ./changePermissions.pl
+  
+
+  configuration of pooled acounts
+  - mkdir /etc/grid-security/gridmapdir
+  export GRIDMAPDIR=/etc/grid-security/gridmapdir
+  (ideally put this line on top of $GLOBUS_LOCATION/etc/globus-user-env.sh or $VDT_LOCATION/setup.sh)
+  make sure that the UIDs specified in the scripts addILDGusers.sh and addUKQusers.sh will not clash with the already existing ones.
+  - ./addILDGusers.sh
+  - ./addUKQusers.sh
+  - cp cleanILDGusers.sh /etc/cron.hourly
+  - cp cleanUKQusers.sh /etc/cron.hourly
+  - restart gridftp and gatekeeper for changes to take effect
+
+  install new version of VOMS
+  - cd $QCDGRID_HOME/tools/edg
+  - change paths in cgm-crontask and create-grid-mapfile
+  - run create-grid-mapfile and see if new grid-mapfile was generated with '.ukq' and '.ild' mappings
+  - cp cgm-crontask to /etc/cron.daily (replace the previous installation)
+
+other configuration tasks
+
+  install automatic updates of Certificate Revocation List
+  - as root: cp $QCDGRID_HOME/tools/updateCRLcrontask /etc/cron.daily
+
+Testing the installation:
+
+  - run as a normal user (with your proxy): digs-test-setup
+  - or, if on control node, run as qcdgrid user

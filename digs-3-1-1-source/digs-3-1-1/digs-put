@@ -1,0 +1,4 @@
+#!/bin/bash
+
+java -DBROWSER_HOME=$BROWSER_HOME -Djava.awt.headless=true uk.ac.ed.epcc.qcdgrid.metadata.QCDgridSubmitter $*
+

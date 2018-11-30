@@ -1,0 +1,24 @@
+Storage Element Test Suite
+==========================
+The test suite consists of 2 executables: runAllTests, which actually runs the
+tests and reports the results, and setup-se-test which sets up the environment
+ready for running the tests. To use the test suite:
+
+ 1. Edit setest.conf and customise the values for the SE being tested
+
+ 2. Run setup-se-test to set up the environment ready for testing. It looks for
+    setest.conf in the current directory, or you can pass an alternative config
+    file path on the command line
+
+ 3. Run runAllTests to perform the tests. Again it looks for setest.conf in the
+    current directory or in the location given on the command line
+
+There is a limitation of this system; the test suite expects some files and
+directories to be in place on the SE when the tests start. In order to create
+this file structure, the setup program must use the SE interface itself to
+access the storage. This means that the setup program may fail if the SE adaptor
+is buggy, and it may not be possible to run the test suite in order to debug it.
+This can be worked around by creating the required file structure on the SE (see
+the source code of setup-se-test for what this structure should be) manually
+using a different client tool.
+

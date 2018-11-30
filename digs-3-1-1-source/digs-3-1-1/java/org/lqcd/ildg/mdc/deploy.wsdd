@@ -1,0 +1,83 @@
+<!-- Use this file to deploy some handlers/chains and services      -->
+<!-- Two ways to do this:                                           -->
+<!--   java org.apache.axis.client.AdminClient deploy.wsdd          -->
+<!--      after the axis server is running                          -->
+<!-- or                                                             -->
+<!--   java org.apache.axis.utils.Admin client|server deploy.wsdd   -->
+<!--      from the same directory that the Axis engine runs         -->
+
+<deployment
+    xmlns="http://xml.apache.org/axis/wsdd/"
+    xmlns:java="http://xml.apache.org/axis/wsdd/providers/java">
+
+  <!-- Services from MetadataCatalogueService WSDL service -->
+
+  <service name="MetadataCatalogue" provider="java:RPC" style="rpc" use="encoded">
+      <parameter name="wsdlTargetNamespace" value="urn:mdc.ildg.lqcd.org"/>
+      <parameter name="wsdlServiceElement" value="MetadataCatalogueService"/>
+      <parameter name="schemaUnqualified" value="urn:mdc.ildg.lqcd.org"/>
+      <parameter name="wsdlServicePort" value="MetadataCatalogue"/>
+      <parameter name="className" value="org.lqcd.ildg.mdc.MdcSoapBindingImpl"/>
+      <parameter name="wsdlPortType" value="MDCInterface"/>
+      <parameter name="typeMappingVersion" value="1.2"/>
+      <parameter name="databaseServer" value="localhost"/>
+      <parameter name="databasePort" value="8080"/>
+      <parameter name="databaseUser" value="username"/>
+      <parameter name="databasePassword" value="password"/>
+
+
+      <operation name="doEnsembleURIQuery" qname="operNS:doEnsembleURIQuery" xmlns:operNS="urn:mdc.ildg.lqcd.org" returnQName="doEnsembleURIQueryReturn" returnType="rtns:QueryResults" xmlns:rtns="urn:mdc.ildg.lqcd.org" soapAction="" >
+        <parameter qname="queryFormat" type="tns:string" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+        <parameter qname="queryString" type="tns:string" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+        <parameter qname="startIndex" type="tns:int" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+        <parameter qname="maxResults" type="tns:int" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+      </operation>
+      <operation name="doConfigurationLFNQuery" qname="operNS:doConfigurationLFNQuery" xmlns:operNS="urn:mdc.ildg.lqcd.org" returnQName="doConfigurationLFNQueryReturn" returnType="rtns:QueryResults" xmlns:rtns="urn:mdc.ildg.lqcd.org" soapAction="" >
+        <parameter qname="queryFormat" type="tns:string" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+        <parameter qname="queryString" type="tns:string" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+        <parameter qname="startIndex" type="tns:int" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+        <parameter qname="maxResults" type="tns:int" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+      </operation>
+      <operation name="getEnsembleMetadata" qname="operNS:getEnsembleMetadata" xmlns:operNS="urn:mdc.ildg.lqcd.org" returnQName="getEnsembleMetadataReturn" returnType="rtns:MetadataResult" xmlns:rtns="urn:mdc.ildg.lqcd.org" soapAction="" >
+        <parameter qname="ensembleURI" type="tns:string" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+      </operation>
+      <operation name="getConfigurationMetadata" qname="operNS:getConfigurationMetadata" xmlns:operNS="urn:mdc.ildg.lqcd.org" returnQName="getConfigurationMetadataReturn" returnType="rtns:MetadataResult" xmlns:rtns="urn:mdc.ildg.lqcd.org" soapAction="" >
+        <parameter qname="configurationLFN" type="tns:string" xmlns:tns="http://www.w3.org/2001/XMLSchema"/>
+      </operation>
+      <operation name="getMDCinfo" qname="operNS:getMDCinfo" xmlns:operNS="urn:mdc.ildg.lqcd.org" returnQName="getMDCinfoReturn" returnType="rtns:MDCinfo" xmlns:rtns="urn:mdc.ildg.lqcd.org" soapAction="" >
+      </operation>
+      <parameter name="allowedMethods" value="doEnsembleURIQuery getMDCinfo getConfigurationMetadata getEnsembleMetadata doConfigurationLFNQuery"/>
+
+      <typeMapping
+        xmlns:ns="urn:mdc.ildg.lqcd.org"
+        qname="ns:QueryResults"
+        type="java:org.lqcd.ildg.mdc.QueryResults"
+        serializer="org.apache.axis.encoding.ser.BeanSerializerFactory"
+        deserializer="org.apache.axis.encoding.ser.BeanDeserializerFactory"
+        encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+      />
+      <typeMapping
+        xmlns:ns="urn:mdc.ildg.lqcd.org"
+        qname="ns:MetadataResult"
+        type="java:org.lqcd.ildg.mdc.MetadataResult"
+        serializer="org.apache.axis.encoding.ser.BeanSerializerFactory"
+        deserializer="org.apache.axis.encoding.ser.BeanDeserializerFactory"
+        encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+      />
+      <typeMapping
+        xmlns:ns="urn:mdc.ildg.lqcd.org"
+        qname="ns:MDCinfo"
+        type="java:org.lqcd.ildg.mdc.MDCinfo"
+        serializer="org.apache.axis.encoding.ser.BeanSerializerFactory"
+        deserializer="org.apache.axis.encoding.ser.BeanDeserializerFactory"
+        encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+      />
+      <arrayMapping
+        xmlns:ns="urn:mdc.ildg.lqcd.org"
+        qname="ns:ArrayOf_xsd_string"
+        type="java:java.lang.String[]"
+        innerType="cmp-ns:string" xmlns:cmp-ns="http://www.w3.org/2001/XMLSchema"
+        encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+      />
+  </service>
+</deployment>

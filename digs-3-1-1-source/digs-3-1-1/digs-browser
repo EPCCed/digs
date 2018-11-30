@@ -1,0 +1,4 @@
+#!/bin/sh
+cd $QCDGRID_HOME/java/ildg_browser/
+./digs-browser.sh
+

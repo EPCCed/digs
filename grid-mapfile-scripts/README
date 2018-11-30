@@ -1,0 +1,17 @@
+First please set up the following paths in the file createGridmapFile.py:
+
+  config['email'] = 'your.email@x.ac.uk'
+  config['ukqcd'] = 'ukqcd' #desired mapping in the grid-mapfile for UKQCD members
+  config['ildg'] = 'ildg' #desired mapping in the grid-mapfile for ILDG members    
+  config['gridmapfile'] = '/etc/grid-security/grid-mapfile'
+  config['gridmapfilelocal'] = '/etc/grid-security/grid-mapfile-local'
+  config['gridmapfileold'] = '/etc/grid-security/grid-mapfile-old'
+  config['key'] = '/etc/grid-security/hostkey.pem'
+  config['cert'] = '/etc/grid-security/hostcert.pem'
+
+then run it as root like this:
+
+  python createGridmapFIle.py
+ 
+Note, that this operation should happen frequently. We recommend to set up a cron job which executes this task at least once a day.
+

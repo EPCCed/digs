@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2006 U (http://www.altova.com) by Chris Maynard (EPCC) -->
+<gaugeConfiguration xmlns="http://www.lqcd.org/ildg/QCDml/config1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.lqcd.org/ildg/QCDml/config1.2
+C:\DOCUME~1\CHRISM~1\MYDOCU~1\ALTOVA~1\QCDml1.2\QCDml1.2.1Config.xsd">
+	<management>
+		<crcCheckSum>632403371</crcCheckSum>
+		<archiveHistory>
+			<elem>
+				<revisionAction>generate</revisionAction>
+				<participant>
+					<name>bjp</name>
+					<institution>UoE</institution>
+				</participant>
+				<date>2005-10-07T12:00:00</date>
+			</elem>
+		</archiveHistory>
+	</management>
+	<implementation>
+		<machine>
+			<name>rack34</name>
+			<institution>UoE</institution>
+			<machineType>QCDOC</machineType>
+		</machine>
+		<code>
+			<name>CPS</name>
+			<version>v4_9_2_multitimescale_rhmc/qos-2.6.0i</version>
+			<date>2005-09-07T12:00:00</date>
+		</code>
+	</implementation>
+	<algorithm/>
+	<precision>double</precision>
+	<markovStep>
+		<markovChainURI>http://www.epcc.ed.ac.uk/ildg/test/ENS1</markovChainURI>
+		<series>0</series>
+		<update>5</update>
+		<avePlaquette>0.6094749439097268</avePlaquette>
+		<dataLFN>lfn://ukqcd/ildg/test/Cfg12</dataLFN>
+	</markovStep>
+</gaugeConfiguration>

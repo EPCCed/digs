@@ -1,0 +1,1031 @@
+#!/usr/bin/perl
+
+########################################################################
+#
+#   Filename:   digs-test-setup
+#
+#   Authors:    James Perry, Radoslaw Ostrowski (jamesp, radek)   EPCC.
+#
+#   Purpose:    Verifies the setup of the DiGS node
+#
+#   Contents:   Various tests
+#
+#   Used in:    Administration of QCDgrid
+#
+#   Contact:    epcc-support@epcc.ed.ac.uk
+#
+#   Copyright (c) 2003-2007 The University of Edinburgh
+#
+#   This program is free software; you can redistribute it and/or
+#   modify it under the terms of the GNU General Public License as
+#   published by the Free Software Foundation; either version 2 of the
+#   License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#   General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 59 Temple Place - Suite 330, Boston,
+#   MA 02111-1307, USA.
+#
+#   As a special exception, you may link this program with code
+#   developed by the OGSA-DAI project without such code being covered
+#   by the GNU General Public License.
+#
+########################################################################
+
+
+# use Shell;
+use Env;
+# needed for recursive methods
+use File::Find;
+use File::Spec::Functions qw(canonpath rootdir);
+
+# trims whitespaces
+sub trim($);
+
+# use strict;
+
+# imports shell environment variables and ties them to 
+# the variables of the same names
+Env::import();
+
+$debugLevel=0;
+$infoLevel=1;
+$warnLevel=2;
+$errorLevel=3;
+$fatalLevel=4;
+
+if($#ARGV + 1 == 0)
+{
+    # default logger
+    $loggerLevel=$infoLevel;
+    print("Verbosity level = $infoLevel\n");
+}
+# if there is one argument, check if it is integer in the range 0-4
+elsif (( $ARGV[0] =~ /^[01234]$/ ) && ($#ARGV + 1 == 1))
+{
+    print("Verbosity level = $ARGV[0]\n");
+    $loggerLevel=$ARGV[0];
+}
+else
+{
+    print("Usage: digs-test-setup [verbosityLevel]\n");
+    print("  verbosityLevel:\n");
+    print("    0 - debug\n");
+    print("    1 - info\n");
+    print("    2 - warn\n");
+    print("    3 - error\n");
+    print("    4 - fatal\n");
+    print("  If this option is left out, it default to 'info'\n");
+    exit 1;
+}
+
+# --------------------------------------------------
+
+if($infoLevel >= $loggerLevel)
+{
+  printf("Welcome to the DiGS test suite.\n");
+}
+
+# simple tests for Globus
+
+ if($infoLevel >= $loggerLevel) 
+ { 
+   printf("Running Globus tests...\n");
+ }
+ testEnv();
+ testProxy();
+ testLocalGatekepper();
+ testLocalGridFTP();
+
+# tests for DiGS software
+ if($infoLevel >= $loggerLevel) 
+ { 
+   printf("Running DiGS tests...\n");
+ }
+ findPath(); # sets global var QCDGRID_PATH;
+#  QCDGRID_PATH is required for the below
+   findConfigFiles();
+   determineMainNode();
+   tryRunningOnMainNode();
+   tryGridFTPOnMainNode();
+   tryFetchingConfigFiles();
+     testRLS(); # depends on tryFetchingConfigFiles
+
+# outdated, new tests are in testFileSystemPermissions()
+# testDataNewDir();
+
+# DiGS2 tests
+
+# not all machines have pooled accounts
+# testPooledAccountsSetup();
+testFileSystemPermissions();
+# this test is no longer required
+# testRLSsecurity();
+
+
+# if it reached this point there were no errors
+  if($fatalLevel>=$loggerLevel) 
+  { 
+    printf("Your Globus and DiGS installation seem reasonably functional.\n");
+  }
+  exit 0;
+
+
+
+# -------------------------------------------------
+#               Tests subroutines
+# -------------------------------------------------
+
+# Check environment variables
+sub testEnv
+{
+  if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Checking environment variables...\n");
+  }
+  if(! $GLOBUS_LOCATION)
+  {
+    if($errorLevel>=$loggerLevel) 
+    { 
+      printf("GLOBUS_LOCATION variable not set. Please set it to point to your Globus installation.\n");
+    }
+    exit 1;
+  }
+  else
+  {
+    if($infoLevel>=$loggerLevel) 
+    { 
+      printf("\$GLOBUS_LOCATION = $GLOBUS_LOCATION \n");
+    }
+  }
+
+  if(! $GLOBUS_TCP_PORT_RANGE)
+  {
+    if($warnLevel>=$loggerLevel) 
+    { 
+      printf("GLOBUS_TCP_PORT_RANGE is not set. If you have a firewall, this variable should ". 
+      "be set to a range of open ports for dynamic connections. Also ensure that it is set in the ". 
+      "gatekeeper and GridFTP servers' environments.\n");
+    } 
+  }
+  else
+  {
+      if($infoLevel>=$loggerLevel) { printf("\$GLOBUS_TCP_PORT_RANGE = $GLOBUS_TCP_PORT_RANGE \n"); }
+  }
+}
+
+# Check user's proxy
+sub testProxy
+{
+    if($infoLevel>=$loggerLevel) { printf("Checking proxy...\n"); }
+  
+    if($debugLevel>=$loggerLevel) { printf("Proxy details:\n".`grid-proxy-info`); }
+    my $PROXY_RESULT = $?;
+
+    if($debugLevel>=$loggerLevel) { printf("\n\$PROXY_RESULT = $PROXY_RESULT \n"); } 
+    if($PROXY_RESULT eq 127)
+    {
+	if($errorLevel>=$loggerLevel) 
+        { 
+          printf("Cannot find grid-proxy-info. Please run $GLOBUS_LOCATION/etc/globus-user-env.sh ".
+					       "to add Globus binaries and libraries to paths.\n"); 
+        }
+	exit 1;
+    }
+    elsif($PROXY_RESULT eq 4)
+    {
+	if($errorLevel>=$loggerLevel) { printf("No proxy found. Please run grid-proxy-init to create one.\n"); }
+	exit 1;
+    }
+    elsif($PROXY_RESULT ne 0)
+    {
+	if($errorLevel>=$loggerLevel) { printf("Error code $PROXY_RESULT returned from grid-proxy-info.\n"); }
+	exit 1;
+    }
+    else
+    {
+	if($infoLevel>=$loggerLevel) { printf("Proxy found.\n"); }
+    }
+
+    my $PROXY_TIMELEFT = `grid-proxy-info -timeleft`;
+
+    if($debugLevel>=$loggerLevel) { printf("\$PROXY_TIMELEFT = $PROXY_TIMELEFT \n"); }
+   
+    if($PROXY_TIMELEFT le 0)
+    {
+	if($errorLevel>=$loggerLevel) { printf("Proxy has expired - please run grid-proxy-init again\n"); }
+	exit 1;
+    }
+
+}
+
+# Test local Globus gatekeeper
+sub testLocalGatekepper
+{
+    if($infoLevel>=$loggerLevel) { printf("Testing local Globus gatekeeper...\n"); }
+
+    my $TEST_GLOBUS_HOSTNAME=`globus-hostname`;
+    chomp($TEST_GLOBUS_HOSTNAME);
+    if($debugLevel>=$loggerLevel) { printf("\$TEST_GLOBUS_HOSTNAME= $TEST_GLOBUS_HOSTNAME \n"); }
+
+    # simple check if fully qualified domain
+    if($TEST_GLOBUS_HOSTNAME =~ m/[a-zA-Z]*[a-zA-Z0-9]*\.[a-zA-Z]*[a-zA-Z0-9]*/)
+    {
+	if($infoLevel>=$loggerLevel) { printf("Hostname reported as $TEST_GLOBUS_HOSTNAME \n"); }
+        $GLOBUS_HOSTNAME = $TEST_GLOBUS_HOSTNAME;
+    }
+    # if not FQD check if it is set as an environment variable
+    elsif($GLOBUS_HOSTNAME)
+    {
+	if($infoLevel>=$loggerLevel) { printf("Hostname reported as $GLOBUS_HOSTNAME \n"); }
+    }
+    else
+    {
+	if($errorLevel>=$loggerLevel) 
+        { 
+          printf("Command 'globus-hostname' does not report hostname as a fully qualified domain. ".
+		       "Set variable \$GLOBUS_HOSTNAME manually.\n");
+      }
+        exit 1;
+    }
+    
+    if($infoLevel>=$loggerLevel) { printf("Submitting basic job...\n"); }
+
+    my $QCDGRID_TEST_JOB_RESULT = `globus-job-run $GLOBUS_HOSTNAME /bin/echo qcdgridtest`;
+    chomp($QCDGRID_TEST_JOB_RESULT);
+
+    if($QCDGRID_TEST_JOB_RESULT eq "qcdgridtest")
+    {
+	if($infoLevel>=$loggerLevel) { printf("Test job successful!\n"); }
+    }
+    else
+    {
+	if($errorLevel>=$loggerLevel) 
+        { 
+          printf("Test job failed!\n"."Expected: qcdgridtest\n"."Returned: $QCDGRID_TEST_JOB_RESULT\n".
+	  "Possible solutions:\n".
+	  "1. Ensure that the Globus gatekeeper is running, either from xinetd or directly\n".
+	  "2. Ensure that your certificate is listed in the grid map file, and its CA is trusted\n");
+	}
+        exit 1;
+    }
+}
+
+
+# Test local GridFTP server
+sub testLocalGridFTP
+{
+    if($infoLevel>=$loggerLevel) { printf("Transferring test file by GridFTP...\n"); }
+
+    # seconds from 1900 as a unique identifier
+    my $UID = `date +'%s'`;
+    if($debugLevel>=$loggerLevel) { printf("\$UID = ", $UID); }
+    chomp($UID);
+    my $QCDGRID_FTP_TEST_FILE1 = "/tmp/qcdgridtest_$UID";
+    my $QCDGRID_FTP_TEST_FILE2 = "/tmp/qcdgridtestresult_$UID";
+    if($debugLevel>=$loggerLevel) { printf("\$QCDGRID_FTP_TEST_FILE1 = $QCDGRID_FTP_TEST_FILE1 \n"); }
+    if($debugLevel>=$loggerLevel) { printf("\$QCDGRID_FTP_TEST_FILE2 = $QCDGRID_FTP_TEST_FILE2 \n"); }
+
+    `echo "DiGS test FTP file" > $QCDGRID_FTP_TEST_FILE1`;
+    `cat $QCDGRID_FTP_TEST_FILE1`;
+
+    if($debugLevel>=$loggerLevel) 
+    { 
+      printf("Trying \"globus-url-copy gsiftp://${GLOBUS_HOSTNAME}${QCDGRID_FTP_TEST_FILE1} file://$QCDGRID_FTP_TEST_FILE2\"...\n");
+    `globus-url-copy gsiftp://${GLOBUS_HOSTNAME}${QCDGRID_FTP_TEST_FILE1} file://$QCDGRID_FTP_TEST_FILE2`;
+    `diff $QCDGRID_FTP_TEST_FILE1 $QCDGRID_FTP_TEST_FILE2`;
+    }
+
+    if($? eq 0)
+    {
+	if($infoLevel>=$loggerLevel) { printf("GridFTP test succeeded!\n"); }
+
+	`rm $QCDGRID_FTP_TEST_FILE1 2>/dev/null`;
+	`rm $QCDGRID_FTP_TEST_FILE2 2>/dev/null`;
+    }
+    else
+    {
+	if($errorLevel>=$loggerLevel) 
+        { 
+          printf("GridFTP test failed!\n". 
+	  "Possible solutions:\n".
+	  "1. Ensure that the GridFTP server is running, either from xinetd or directly\n".
+	  "2. Ensure that your certificate is listed in the grid map file, and its CA is trusted\n".
+	  "3. Ensure that there are no config files from other FTP servers interfering with GridFTP\n");
+        }
+
+	'rm $QCDGRID_FTP_TEST_FILE1';
+	'rm $QCDGRID_FTP_TEST_FILE2';
+	exit 1;
+    }
+
+}
+
+
+# Determine path of DiGS software
+sub findPath
+{
+    if($infoLevel>=$loggerLevel) { printf("Determining path for DiGS software...\n"); }
+
+    `which digs-list >/dev/null 2>/dev/null`;
+    if($? eq 0)
+    {
+	if($infoLevel>=$loggerLevel) { printf("DiGS binaries found! \n"); }
+    }
+    else
+    {
+	if($errorLevel>=$loggerLevel) { printf("DiGS binaries not found - please add to path!\n"); }
+	exit 1;
+    }
+
+    my $QCDGRIDLIST_PATH = `which digs-list 2>/dev/null`;
+    if($debugLevel>=$loggerLevel) { printf("\$QCDGRIDLIST_PATH = $QCDGRIDLIST_PATH \n"); }
+    if($QCDGRIDLIST_PATH =~ m/.*"digs-list".*/)
+    {
+	if($errorLevel>=$loggerLevel) 
+        { 
+          printf("Your version of the 'which' utility is not compatible with DiGS.\n".
+		       "Please use a standard version!\n");
+         }
+	exit 1;
+    }
+
+    $QCDGRIDLIST_PATH =~ s/digs\-list//;
+    if($infoLevel>=$loggerLevel) { printf("DiGS path = $QCDGRIDLIST_PATH"); }
+    $QCDGRID_PATH = $QCDGRIDLIST_PATH;
+    chomp($QCDGRID_PATH);
+}
+
+# Look for config files
+sub findConfigFiles
+{
+    if(-e "$QCDGRID_PATH/nodes.conf")
+    {
+        if($infoLevel>=$loggerLevel) { printf("Main node config file found.\n"); }
+    }
+    else
+    {
+	if($debugLevel>=$loggerLevel) { printf("$QCDGRID_PATH/nodes.conf \n"); }
+	if($errorLevel>=$loggerLevel) { printf("File 'nodes.conf' not found in DiGS directory, please create it\n"); }
+	exit 1;
+    }
+
+    if(-e "$QCDGRID_PATH/nodeprefs.conf")
+    {
+        if($infoLevel>=$loggerLevel) { printf("Node preference list found.\n"); }
+    }
+    else
+    {
+        if($errorLevel>=$loggerLevel) { printf("File 'nodeprefs.conf' not found in DiGS directory, please create it!\n"); }
+        exit 1;
+    }
+}
+
+# Determine main node name
+sub determineMainNode
+{
+    $QCDGRID_MAIN_NODE=`cat $QCDGRID_PATH/nodes.conf | grep node | grep -\v backup | sed 's/.*=//' | sed 's/#.*//' | tr -d ' \t'`;
+    chomp($QCDGRID_MAIN_NODE);
+    if($infoLevel>=$loggerLevel) { printf("Main node name: $QCDGRID_MAIN_NODE \n"); }
+
+# and path to DiGS software on that node
+    $QCDGRID_MAIN_NODE_PATH=`cat $QCDGRID_PATH/nodes.conf | grep path | grep -v backup | sed 's/.*=//' | sed 's/#.*//' | tr -d ' \t'`;
+    chomp($QCDGRID_MAIN_NODE_PATH);
+    if($infoLevel>=$loggerLevel) { printf("DiGS path on main node: $QCDGRID_MAIN_NODE_PATH \n"); }
+}
+
+# Try simple Globus job submission to main node
+sub tryRunningOnMainNode
+{
+    if($infoLevel>=$loggerLevel) { printf("Submitting basic job to main node...\n"); }
+
+    if($debugLevel>=$loggerLevel) { printf("Trying \"globus-job-run $QCDGRID_MAIN_NODE /bin/echo qcdgridtest\"...\n"); }
+    my $QCDGRID_TEST_JOB_RESULT=`globus-job-run $QCDGRID_MAIN_NODE /bin/echo qcdgridtest`;
+    if($debugLevel>=$loggerLevel) { printf("\$QCDGRID_TEST_JOB_RESULT = $QCDGRID_TEST_JOB_RESULT \n"); }
+    chomp($QCDGRID_TEST_JOB_RESULT);
+
+    if($QCDGRID_TEST_JOB_RESULT eq "qcdgridtest")
+    {
+        if($infoLevel>=$loggerLevel) { printf("Test job successful.\n"); }
+    }
+    else
+    {
+        if($errorLevel>=$loggerLevel) { printf("Test job failed, returned: $QCDGRID_TEST_JOB_RESULT \n");}        
+        if($errorLevel>=$loggerLevel) 
+        { 
+          printf("Possible solutions:\n".
+          "1. Ensure that the Globus gatekeeper is running on the main node, e\ither from xinetd or directly\n".
+	  "2. Ensure that your certificate is listed in the grid map file, and\ its CA is trusted\n");
+	}
+        exit 1;
+    }
+}
+
+# Try fetching grid map file from main node
+sub tryGridFTPOnMainNode
+{   
+    if($infoLevel>=$loggerLevel) { printf("Testing main node's GridFTP server by fetching grid-mapfile...\n"); }
+
+    my $QCDGRID_FTP_TEST_FILE2 = "/tmp/QCDGRIDtestfile";
+    if($debugLevel>=$loggerLevel) 
+    { 
+      printf("Trying \"globus-url-copy gsiftp://${QCDGRID_MAIN_NODE}/etc/grid-security/grid-mapfile file://${QCDGRID_FTP_TEST_FILE2}\" ...\n");
+      `globus-url-copy gsiftp://${QCDGRID_MAIN_NODE}/etc/grid-security/grid-mapfile file://${QCDGRID_FTP_TEST_FILE2}`; 
+    }
+
+    if($? eq 0)
+    {
+        if($infoLevel>=$loggerLevel) { printf("Test file transfer successful.\n"); }
+        `rm $QCDGRID_FTP_TEST_FILE2 2>/dev/null`;
+    }
+    else
+    {
+        if($errorLevel>=$loggerLevel) { printf("GridFTP test failed!\n".
+        "Possible solutions:\n".
+        "1. Ensure that the GridFTP server is running, either from xinetd or\ directly\n".
+        "2. Ensure that your certificate is listed in the grid map file, and\ its CA is trusted\n".
+        "3. Ensure that there are no config files from other FTP servers int\erfering with GridFTP\n");
+	`rm $QCDGRID_FTP_TEST_FILE2 2>/dev/null`;  }
+        exit 1;
+    }
+
+}
+
+# Try fetching each configuration file from main node
+# 
+
+sub tryFetchingConfigFiles
+{
+  @CFG_FILES=("mainnodelist.conf", "deadnodes.conf", "disablednodes.conf", "retiringnodes.conf");
+  
+  foreach my $QCDGRID_CFG_FILE (@CFG_FILES)
+  {
+      fetchFile("${QCDGRID_MAIN_NODE}${QCDGRID_MAIN_NODE_PATH}", "$QCDGRID_CFG_FILE", "/tmp/DiGSTestFile", 1); 
+  }
+
+}
+
+# Test replica catalogue
+# Depends on tryFetchingConfigFiles
+sub testRLS
+{
+    if($infoLevel>=$loggerLevel) { printf("Testing Replica Location Service on control node...\n"); }
+
+# 1 check if there is $GLOBUS_LOCATION on control node
+
+    if($debugLevel>=$loggerLevel) { printf("Trying 'globus-job-run $QCDGRID_MAIN_NODE /bin/env | grep GLOBUS_LOCATION'...\n"); }
+  $MAIN_NODE_GLOBUS_PATH = `globus-job-run $QCDGRID_MAIN_NODE /bin/env | grep GLOBUS_LOCATION`;
+  chomp($MAIN_NODE_GLOBUS_PATH);
+
+  if(! $MAIN_NODE_GLOBUS_PATH)
+  {
+      if($errorLevel>=$loggerLevel) 
+      { 
+        printf("\$GLOBUS_LOCATION is not in set on $QCDGRID_MAIN_NODE.\n".
+		   "Could not verify RLS!\n"); 
+      }
+      exit 1;
+  }
+  else
+  {
+      $MAIN_NODE_GLOBUS_PATH =~ s/GLOBUS_LOCATION=//;
+      if($debugLevel>=$loggerLevel) { printf("\$GLOBUS_LOCATION on $QCDGRID_MAIN_NODE is $MAIN_NODE_GLOBUS_PATH \n"); }
+  }
+
+# 2 try if rls is installed by running `globus-rls-cli -v`
+
+    if($debugLevel>=$loggerLevel) { printf("Trying 'globus-job-run ${QCDGRID_MAIN_NODE} ${MAIN_NODE_GLOBUS_PATH}/bin/globus-rls-cli -v'...\n"); }
+
+  my $RLS_VERSION = `globus-job-run ${QCDGRID_MAIN_NODE} ${MAIN_NODE_GLOBUS_PATH}/bin/globus-rls-cli -v`;
+  
+  if($? ne 0)
+  {
+      if($errorLevel>=$loggerLevel) { printf("Could not run 'globus-rls-cli' command!\n".
+		         "Check if RLS is installed on control node $QCDGRID_MAIN_NODE!\n"); }
+      exit 1;
+  }
+  else
+  {   
+      chomp($RLS_VERSION);      
+      if($debugLevel>=$loggerLevel) { printf("\$RLS_VERSION = $RLS_VERSION \n"); }
+      if($infoLevel>=$loggerLevel) { printf("RLS is installed! $RLS_VERSION \n"); }
+  }
+
+
+# 3 check if there is a port specified for RLS in 'qcdgrid.conf' on main node
+ 
+  my $QCDGRID_FTP_TEST_FILE2 = "/tmp/QCDGRIDtestfile";
+
+  fetchFile("${QCDGRID_MAIN_NODE}${QCDGRID_MAIN_NODE_PATH}", "qcdgrid.conf", "$QCDGRID_FTP_TEST_FILE2", 0); 
+
+  my $QCDGRID_RC_PORT=`cat $QCDGRID_FTP_TEST_FILE2 | grep rc_port | sed "s/rc_port\ *=//"`;
+  chomp($QCDGRID_RC_PORT);
+  $QCDGRID_RC_PORT = trim($QCDGRID_RC_PORT);
+
+  if(! $QCDGRID_RC_PORT)
+  {
+      if($warnLevel>=$loggerLevel) 
+      { 
+        printf("Replica catalogue port is not set up in 'qcdgrid.conf' on main node!\n".
+   	        "Defaulting to 39281.\n"); 
+      }
+      $QCDGRID_RC_PORT = 39281;
+      if($debugLevel>=$loggerLevel) { printf("Deleting $QCDGRID_FTP_TEST_FILE2...\n"); }
+      `rm $QCDGRID_FTP_TEST_FILE2`;
+  }
+  else
+  {
+      if($debugLevel>=$loggerLevel) { printf("\$QCDGRID_RC_PORT = $QCDGRID_RC_PORT \n"); }
+      if($infoLevel>=$loggerLevel) { printf("Replica catalogue is on port $QCDGRID_RC_PORT \n"); }
+      if($debugLevel>=$loggerLevel) { printf("Deleting $QCDGRID_FTP_TEST_FILE2...\n"); }
+      `rm $QCDGRID_FTP_TEST_FILE2`;
+  }
+
+  
+
+# 4 check if RLS is running and alive (ping)
+    if($debugLevel>=$loggerLevel) { printf("Trying 'globus-job-run ${QCDGRID_MAIN_NODE}  ${MAIN_NODE_GLOBUS_PATH}/bin/globus-rls-admin -p rls://$QCDGRID_MAIN_NODE:$QCDGRID_RC_PORT'...\n"); }
+  my $RLSerror=`globus-job-run ${QCDGRID_MAIN_NODE}  ${MAIN_NODE_GLOBUS_PATH}/bin/globus-rls-admin -p rls://$QCDGRID_MAIN_NODE:$QCDGRID_RC_PORT >/dev/null`;
+
+
+    if($debugLevel>=$loggerLevel) { printf("RLSerror = $RLSerror \n"); }
+ 
+# this should be generalised!
+# if there is a word 'error' in response then fail 
+  if($RLSerror =~ m/error/)
+  {
+      if($errorLevel>=$loggerLevel) 
+      { 
+        printf("RLS is not responding on $QCDGRID_MAIN_NODE:$QCDGRID_RC_PORT!\n".
+		     "1. Make sure that the RLS is up and running (globus-rls-server)\n".
+		     "2. If RLS is running on different port than 39281 add an entry to ".
+  		     " the 'qcdgrid.conf' file (rc_port=PORT_NUMBER)\n"); 
+      }
+      exit 1;
+  }
+  else
+  {
+      if($infoLevel>=$loggerLevel) { printf("RLS is up and running on $QCDGRID_MAIN_NODE:$QCDGRID_RC_PORT!\n"); }
+  }
+
+}
+
+# tests if there is a data/NEW directory on the main node and if it has the correct permissions
+sub testDataNewDir
+{
+    if($infoLevel>=$loggerLevel) { printf("Testing if there is a 'data/NEW' directory with the correct permissions...\n"); }
+    if($debugLevel>=$loggerLevel) { printf("Running \"globus-job-run $QCDGRID_MAIN_NODE /bin/ls -al $QCDGRID_MAIN_NODE_PATH/data 2>/dev/null | grep NEW | grep drwxrwxrwx | awk '{print \$3}'\"...\n"); }
+    my $result = `globus-job-run $QCDGRID_MAIN_NODE /bin/ls -al $QCDGRID_MAIN_NODE_PATH/data 2>/dev/null | grep NEW | grep drwxrwxrwx | awk '{print \$3}'`;
+    chomp($result);
+    if($debugLevel>=$loggerLevel) { printf("\$result = $result \n"); }
+    if($result eq "qcdgrid")
+    {
+	if($infoLevel>=$loggerLevel) { printf("Test succedeed!\n"); }
+    }
+    else
+    {
+	if($errorLevel>=$loggerLevel) 
+        { 
+          printf("Test failed!\n".
+		       "1. Check if there is a 'data' directory in DiGS installation on the main node.\n".
+		       "2. Make sure it is owned by 'qcdgrid' user\n".
+		       "3. Check if there is 'data/NEW' directory\n".
+		       "4. Make sure it is owned by 'qcdgrid' and has the right permissions (drwxrwxrwx)\n");
+	}
+        exit 1;
+    }
+
+
+}
+
+
+# tests created for DiGS ver2
+
+# test pooled accounts/ grid-mapfile setup
+sub testPooledAccountsSetup
+{
+# 1. check if there is a /etc/grid-security/gridmapdir directory and thet  env variable GRIDMAPDIR points to it
+
+    my $gmdir = "/etc/grid-security/gridmapdir";
+
+  if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Testing pooled accounts/grid-mapfile setup...\n");
+    printf("Checking if environment variable GRIDMAPDIR = /etc/grid-security/gridmapdir...\n");
+  }  
+
+  if(! -d $gmdir)
+  {
+    if($errorLevel>=$loggerLevel) 
+    { 
+      printf("Pooled accounts directory $gridmapdir doesn't exist!\n");
+    }
+    exit 1;
+  }
+  elsif(! $GRIDMAPDIR || ($GRIDMAPDIR ne $gmdir))
+  {
+      if($errorLevel>=$loggerLevel) 
+      {  
+        printf("Please set GRIDMAPDIR env variable to $gmdir.\n");
+      }
+      exit 1;
+  }
+   
+  if($debugLevel>=$loggerLevel) { printf("\$GRIDMAPDIR = $GRIDMAPDIR \n");}
+
+# 2. check if there are ild000 and ukq000 type accounts in /home/ildg and /home/ukqcd
+
+# [radek@edqcdgrid ~]$ grep "ukq000" /etc/passwd
+# ukq000:x:2000:501::/Home/ukqcd/ukq000:/bin/bash
+
+# [radek@edqcdgrid ~]$ grep "ukq0001" /etc/passwd
+
+    my $homePath;
+    my $ildg = "ildg";
+    my $ukqcd = "ukqcd";
+
+    my $ild000 = "ild000";
+    my $ukq000 = "ukq000";
+
+    my $testUsername = `grep $ukq000 /etc/passwd`;
+    if($? eq 1)
+    {
+	if($errorLevel>=$loggerLevel) 
+	{ 
+	    printf("$ukq000 user account does not exist!\n");
+	}
+	exit 1;
+    }
+
+    $testUsername =~ m/(^.*::)(.*)(:.*$)/;
+    $testUsername = $2;
+    $testUsername =~ s/\/$ukqcd\/$ukq000//;			   
+    $homePath = $testUsername;
+    if($debugLevel>=$loggerLevel) { printf("\$homePath = $homePath \n");}
+
+  if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Checking if there are $ild000 and $ukq000 type accounts...\n");
+  }  
+
+  if(! -d "$homePath/$ildg" || ! -d "$homePath/$ukqcd" || ! -d "$homePath/$ildg/$ild000" || ! -d "$homePath/$ukqcd/$ukq000")
+  {
+    if($errorLevel>=$loggerLevel) 
+    { 
+      printf("At least one of the pooled accounts directories $homePath/$ukqcd  $homePath/$ildg" . 
+              "$homePath/$ildg/$ild000  $homePath/$ukqcd/ukq000 doesn't exist!\n");
+    }
+    exit 1;
+  }
+
+# 3. check if there are cleanUKQuser adn cleanILDuser in /etc/cron.hourly
+
+    my $cron = "/etc/cron.hourly"; 
+    my $cleanUKQuser = $cron . "/cleanUKQusers.sh";
+    my $cleanILDuser = $cron . "/cleanILDusers.sh";
+
+  if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Checking if there are cleanUKQusers.sh and cleanILDusers.sh scripts in $cron...\n");
+  }  
+
+  if(! -e $cleanILDuser || ! -e $cleanUKQuser)
+  {
+    if($errorLevel>=$loggerLevel) 
+    { 
+      printf("At least one of the cleaning scripts in not in $cron!\n");
+    }
+    exit 1;
+  }
+
+
+# 4. check if grid-mapfile includes ".ild" and ".ukq" mappings and not "."
+
+    my $gmf = "/etc/grid-security/grid-mapfile";
+    my $ild = ".ild";
+    my $ukq = ".ukq";
+    my $dot = ".";
+    my $error = 1;
+
+  if($infoLevel>=$loggerLevel) 
+  { 
+   printf("Checking the setup of $gmf...\n");
+  }  
+
+open(MYINPUTFILE, "<$gmf");
+while(<MYINPUTFILE>)
+{
+  my($line) = $_;
+  chomp($line);
+  if($line =~ m|(\".*\")(\ )(.*)|)
+  {
+   my($DN, $space, $symbol) = ($1,$2,$3);  
+   chomp($symbol); 
+   if($symbol eq $dot)
+   { 
+    if($errorLevel>=$loggerLevel) 
+    { 
+      printf("SYMBOL = $symbol , ERROR = $error\n");
+      printf("At least one of the grid-mapfile mappings is not $ild or $ukq\n");
+    }
+     close(MYINPUTFILE);
+     exit 1;
+   }
+   else
+   {
+     if($symbol eq $ild || $symbol eq $ukq)
+     {
+	 $error = 0;
+     }
+   }
+  }
+}
+close(MYINPUTFILE);
+
+  if($error == 1)
+  {
+     if($errorLevel>=$loggerLevel) { printf("There are no $ild and $ukq mappings!\n"); }
+     exit 1;
+  }
+
+   if($infoLevel>=$loggerLevel) { printf("Pooled accounts setup looks fine!\n"); }
+}
+
+
+# test file system permissions
+sub testFileSystemPermissions
+{
+#    my $group = "ukqcd";
+    my $error=0;
+
+  if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Testing file system permissions...\n");
+  }  
+
+#$QCDGRID_PATH="/home/qcdgrid/qcdgrid";
+
+my $data=$baseData="$QCDGRID_PATH/data";
+
+# find all the data, data1, data2, ... links and follow them
+my $i = 0;
+while (-e $data)
+{
+  if($debugLevel>=$loggerLevel) 
+  {
+    printf("Data link = $data\n");
+  }
+    chdir $data;
+    $data=`pwd`;
+    chomp($data);
+  if($debugLevel>=$loggerLevel) 
+  {  
+    printf("Data link points to = $data\n");
+  }
+
+    find(\&checkPermissions, $data);
+
+    $i++;
+    $data = $baseData . "$i";
+}
+
+ if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Permissions and ownership of files seem to be OK\n");
+  } 
+# 1. check if files are owned by qcdgrid and readable and executable by UKQCD group STORAGE/qcdgrid
+
+# all files except of NEW
+
+# 2. only directory listing for others
+
+# only directories
+# mode == 0755   ...5
+
+
+}
+
+# test RLS configuration
+sub testRLSsecurity
+{
+
+  if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Testing RLS server security...\n");
+  }  
+
+
+# check if there are the following entries in $GLOBUS_LOCATION/etc/globus-rls-server.conf on the node that runs the RLS server:
+    my $confPath = "/etc/globus-rls-server.conf";
+    my $localCopy = "/tmp/remote-rls-server.conf";
+
+# get the file first (assumes that on central node)
+fetchFile("${QCDGRID_MAIN_NODE}${MAIN_NODE_GLOBUS_PATH}", $confPath, $localCopy, 0); 
+
+  my $qcdgrid = 0;
+  my $ildg = 0;
+  my $ukqcd = 0;
+
+  if($infoLevel>=$loggerLevel) 
+  { 
+    printf("Checking if RLS server script contains the following:
+           \"acl qcdgrid: all\"
+           \"acl ukq0\[0\-9\]\[0\-9\]: lrc_read rli_read stats\"
+           \"acl ukq0\[0\-9\]\[0\-9\]: lrc_read rli_read stats\"...\n");
+  }  
+
+open(MYINPUTFILE, "<$localCopy");
+while(<MYINPUTFILE>)
+{
+  my($line) = $_;
+  chomp($line);
+# 1. acl ild0[0-9][0-9]: lrc_read rli_read stats
+  if($line =~ m|(acl ild0\[0\-9\]\[0\-9\]: lrc_read rli_read stats)|) { $ildg = 1; }
+# 2. acl ukq0[0-9][0-9]: lrc_read rli_read stats
+  if($line =~ m|(acl ukq0\[0\-9\]\[0\-9\]: lrc_read rli_read stats)|) { $ukqcd = 1; }
+# 3. acl qcdgrid: all
+  if($line =~ m|(acl qcdgrid: all)|) { $qcdgrid = 1; }
+}
+close(MYINPUTFILE);
+`rm $localCopy`;
+
+
+if($ildg==0 || $ukqcd==0 || $qcdgrid==0)
+{
+	if($errorLevel>=$loggerLevel) 
+        { 
+	    printf("At least one of the entries wasn't found!\n");
+	}
+	exit 1;
+}
+
+   if($infoLevel>=$loggerLevel) { printf("RLS server acl lists look fine!\n"); }
+}
+
+
+# --------------------------------------------------------------
+# Additional subroutines used by tests
+
+# fetchFile("node/path", "sourceFile", "path/destFile", "0 or 1") 0 - nothing; 1 - delete destFile
+sub fetchFile 
+{
+    my $QCDgridMainNodePath=$_[0];
+    my $sourceFile=$_[1];
+    my $destFile=$_[2];
+    my $delete=$_[3];
+
+    if($infoLevel>=$loggerLevel) { printf("Checking config file $sourceFile...\n"); }
+       
+    if($debugLevel>=$loggerLevel) { printf("Trying 'globus-url-copy gsiftp://$QCDgridMainNodePath/$sourceFile file://$destFile'...\n"); }
+
+    `globus-url-copy gsiftp://$QCDgridMainNodePath/$sourceFile file://$destFile`;
+
+    if($? eq 0)
+    {
+	if($infoLevel>=$loggerLevel) { printf("File $sourceFile found.\n"); }
+  
+      if($delete)
+      {
+	  if($debugLevel>=$loggerLevel) { printf("Deleting file $destFile...\n"); }
+	  `rm $destFile`;
+      }
+    }
+    else
+    {
+      if($errorLevel>=$loggerLevel) 
+      { 
+        printf("Could not transfer $sourceFile\n".
+      "Possible solutions:\n".
+      "1. Check path to DiGS software on main node is set correctly (it's set to $QCDGRID_MAIN_NODE_PATH just now)\n".
+       "2. Check that $sourceFile exists on main node\n".
+       "3. Check that permissions on $sourceFile and its parent directory are set correctly\n");
+      }
+
+      `rm $destFile`;
+      exit 1;
+     }
+
+}
+
+# Perl trim function to remove whitespace from the start and end of the string
+sub trim($)
+{
+	my $string = shift;
+	$string =~ s/^\s+//;
+	$string =~ s/\s+$//;
+	return $string;
+}
+
+
+# obtains a numeric representation of a user or a group in Unix filesystem
+# getID("name", [0|1]) 0 - user; 1 - group
+sub getID
+{
+    my $name =  $_[0];
+    my $group = $_[1];
+    my $file = "/etc/passwd";
+
+    #if group then search /etc/group
+    if($group == 1)
+    {
+	$file = "/etc/group";
+    }
+
+    my $id = `grep "^$name:" $file`;
+    $id =~ m/(^$name:.:)(\d*)(:.*)/;
+    $id = $2; 
+
+    if($id eq "") 
+    {
+      if($errorLevel>=$loggerLevel) { printf("Entry $name wasn't found in $file!
+                Check if the user or the group exists!\n"); } 
+	exit 1;
+    }
+    else
+    {
+	return $id;
+    }
+}
+
+
+# checks if files belong to appropriate users/groups and have appropriate permissions
+
+# includes different permissions for qcdgrid/NEW directory
+# problems might occur when there are some other qcdgrid/NEW directories
+sub checkPermissions {
+  unless ($_ eq '.' or $_ eq '..') {
+  my $tmpFile = canonpath($File::Find::name);
+  my $mode = (stat($tmpFile))[2];
+  my $perm = sprintf " %04o ", $mode & 07777;
+  my $uid = (stat($tmpFile))[4];
+  my $gid = (stat($tmpFile))[5];
+  my $user = "qcdgrid";
+  my $group = "ukqcd";
+  my $expectedGID = getID($group, 1);
+
+  if (-d $tmpFile) {
+    # handle directory
+
+    #check if the file belongs to a user
+    my $expectedID = getID($user, 0);
+    if($uid != $expectedID)
+    {
+      if($warningLevel>=$loggerLevel) { printf("Warning: $tmpFile BELONGS TO: $uid BUT SHOULD BELONG TO: $expectedID\n"); }
+      # exit 1;
+    }
+
+    #check if the permissions are correct
+
+    if($tmpFile =~ /NEW$/)
+    {
+	if($perm =~ /.770/) {} 
+	else
+	{
+          if($warningLevel>=$loggerLevel) { printf("Warning: $tmpFile IS = $perm; SHOULD BE = .770\n"); } 	
+	  # exit 1;
+	}
+    }
+    else
+    {
+	if($perm =~ /.755/) {} 
+	else
+	{
+	    if($warningLevel>=$loggerLevel) { printf("Warning: $tmpFile IS = $perm; SHOULD BE = .755\n"); } 	
+	    # exit 1;
+        }
+    }
+  
+  } else {
+    # handle file
+
+    #check if the file belongs to a user and a group
+    if($gid != $expectedGID)
+    {
+      if($warningLevel>=$loggerLevel) { printf("Warning: $tmpFile BELONGS TO: $gid BUT SHOULD BELONG TO: $expectedGID\n"); }
+      # exit 1;
+    }
+ 
+    my $expectedID = getID($user, 0);
+    if($uid != $expectedID)
+    {
+      if($warningLevel>=$loggerLevel) { printf("Warning: $tmpFile BELONGS TO: $uid BUT SHOULD BELONG TO: $expectedID\n"); }
+      # exit 1;
+    }
+
+    #check if the permissions are correct
+
+    if($perm =~ /.644/ || $perm =~ /.640/ ) {}
+    else 
+    {
+        if($warningLevel>=$loggerLevel) { printf("Warning: $tmpFile IS = $perm; SHOULD BE = .644 or .640\n"); } 	
+	# exit 1;
+    }
+
+  }
+}
+}

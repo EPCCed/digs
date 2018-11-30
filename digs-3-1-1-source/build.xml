@@ -1,0 +1,491 @@
+<?xml version="1.0"?>
+<project name="Targets for DiGS" basedir="." default="make-client">
+
+  <!-- set global properties for this build -->
+
+  <!-- To check out latest version of files set value as HEAD.
+       To check out a tagged version specify its name -->
+  <!--property name="cvs.tag" value="DiGS2-CR1"/-->
+  <property name="cvs.tag" value="HEAD"/>
+
+  <property name="cvs.home" location="${basedir}/fromCvs3"/>
+  <property name="cvs.dir" location="${basedir}/fromCvs3/qcdgrid"/>
+  <property name="cvs.username" value="eilidh"/>
+  <property name="version" value="3-1-1"/>
+  <property name="ildg-browser-version" value="1.6"/>
+  <property name="ildg-browser-dist" location="${basedir}/ildg-browser"/>
+  <property name="dist.dir" location="${basedir}/digs-${version}"/>
+  <property name="src.dir" location="${dist.dir}/src"/>
+  <property name="se_src.dir" location="${dist.dir}/StorageElementInterface/src"/>
+  <property name="java.dir" location="${dist.dir}/java"/>
+  <property name="js.dir" location="${dist.dir}/js"/>
+  <property name="make" location="/usr/bin/make"/>
+  <property name="makefile" location="${dist.dir}/Makefile"/>
+
+
+  <!-- Stuff for compiling java sources -->
+  <property name="workDir" location="${dist.dir}/work"/>
+  <property name="src" location="${workDir}/src"/>
+  <property name="bin" location="${workDir}/bin"/>
+  <property name="lib" location="${bin}/lib"/>
+
+  <property name="qcdgridjar" location="${dist.dir}/QCDgrid.jar"/>
+  <property name="qcdgridwsjar" location="${dist.dir}/QCDgridWebServices.jar"/>
+  <property name="qcdgridtestjar" location="${dist.dir}/QCDgridTest.jar"/>
+
+  <property name="ildg-browser.dir" location="${java.dir}/ildg_browser"/>
+  <property name="axis-libs.dir" location="${java.dir}/axis_jars"/>
+  <property name="exist-libs.dir" location="${java.dir}/exist_libraries"/>
+
+  <!-- JNI -->
+  <property name="jni.dir" location="${java.dir}/jni"/>
+  <property name="jni.compilesh" location="${jni.dir}/compile.sh"/>
+
+  <property name="compile" location="${dist.dir}/COMPILE"/>
+  <property name="bashscript" location="${basedir}/bashscript"/>
+
+<!--
+============================================================================
+                    CLASSPATH AND ENV VARIABLES RELATED
+============================================================================
+-->
+
+  <!-- Gives access to all env variables -->
+  <!-- e.g. ${env.CLASSPATH} -->
+  <property environment="env"/>
+
+  <path id="project.classpath">
+    <fileset dir="${axis-libs.dir}">
+      <include name="**/*.jar"/>
+    </fileset>
+    <fileset dir="${exist-libs.dir}">
+      <include name="**/*.jar"/>
+    </fileset>
+    <!-- pathelement path="${bin}"/ -->
+  </path>
+
+<!--
+============================================================================
+                          TARGETS START HERE
+============================================================================
+-->
+
+  <target name="check-environment"
+          description="Checks environment variables">
+
+    <fail unless="env.CVS_RSH">
+      The CVS_RSH environment variable must be set to 'ssh'.
+    </fail>
+
+  </target>
+
+  
+  <target name="checkout" depends="check-environment"
+          description="Imports code from CVS">
+    <mkdir dir="${cvs.dir}"/>
+    <cvs cvsRoot="-z3 -d:ext:${cvs.username}@forge.nesc.ac.uk:/cvsroot/qcdgrid" 
+       package="qcdgrid"
+       dest="${cvs.home}"
+       tag="${cvs.tag}"
+    />
+  </target>
+
+  <target name="prepare-code" depends="checkout" 
+          description="Prepares code for building/packaging">
+  <!-- Remove every directory apart from the following: src java js -->
+    <mkdir dir="${dist.dir}"/>
+
+    <copy file="${cvs.dir}/digs-browser" todir="${dist.dir}"/>
+    <chmod file="${dist.dir}/digs-browser" perm="ugo+x"/>
+    <chmod file="${dist.dir}/digs-browser" perm="go-w"/>
+    <copy file="${cvs.dir}/digs-put" todir="${dist.dir}"/>
+    <chmod file="${dist.dir}/digs-put" perm="ugo+x"/>
+    <chmod file="${dist.dir}/digs-put" perm="go-w"/>
+    <copy file="${cvs.dir}/digs-test-setup" todir="${dist.dir}"/>
+    <chmod file="${dist.dir}/digs-test-setup" perm="ugo+x"/>
+    <chmod file="${dist.dir}/digs-test-setup" perm="go-w"/>
+    <copy file="${cvs.dir}/digs-version" todir="${dist.dir}"/>
+    <chmod file="${dist.dir}/digs-version" perm="ugo+x"/>
+    <chmod file="${dist.dir}/digs-version" perm="go-w"/>
+    <copy file="${cvs.dir}/Makefile" todir="${dist.dir}"/>
+    <copy file="${cvs.dir}/VERSION" todir="${dist.dir}"/>
+    <copy file="${cvs.dir}/build.xml" todir="${dist.dir}"/>
+
+    <mkdir dir="${src.dir}"/>
+    <mkdir dir="${java.dir}"/>
+    <mkdir dir="${js.dir}"/>
+
+    <copy todir="${src.dir}" includeEmptyDirs="false">
+      <fileset dir="${cvs.dir}/src"/>
+    </copy>
+    <copy todir="${se_src.dir}" includeEmptyDirs="false">
+<fileset dir="${cvs.dir}/StorageElementInterface/src"/>
+    </copy>
+
+    <copy todir="${java.dir}" includeEmptyDirs="false">
+      <fileset dir="${cvs.dir}/java"/>
+    </copy>
+    <chmod file="${dist.dir}/java/ildg_browser/digs-browser.sh" perm="ugo+x"/>
+
+    <!-- Need to delete those because they are duplicate classes
+      <delete dir="${ildg-browser.dir}/src"/>
+      <delete file="${ildg-browser.dir}/QCDgrid.jar"/>
+      <delete file="${ildg-browser.dir}/QCDgridWebServices.jar"/>
+    -->
+
+    <copy todir="${js.dir}" includeEmptyDirs="false">
+     <fileset dir="${cvs.dir}/js"/>
+    </copy>
+
+  	<!-- Files required for make-server -->
+
+    <copy file="${cvs.dir}/backup-thread.sh" todir="${dist.dir}"/>
+    <chmod file="${dist.dir}/backup-thread.sh" perm="ugo+x"/>
+    <chmod file="${dist.dir}/backup-thread.sh" perm="go-w"/>
+    <copy file="${cvs.dir}/control-thread.sh" todir="${dist.dir}"/>
+    <chmod file="${dist.dir}/control-thread.sh" perm="ugo+x"/>
+    <chmod file="${dist.dir}/control-thread.sh" perm="go-w"/>
+  	
+  </target>
+
+  <target name="init" depends="prepare-code" 
+          description="Sets up path, classpath and evironments variables">
+    <tstamp/>
+  </target>
+
+<!--
+============================================================================
+                     C SOURCE CODE RELATED (USING MAKE)
+============================================================================
+-->
+
+  <target name="vdt" if="env.VDT_LOCATION">
+    <exec executable="bash">
+      <arg value="-c"/>
+      <arg value="source ${env.VDT_LOCATION}/setup.sh"/>
+    </exec>
+    <echo message="VDT_LOCATION=${env.VDT_LOCATION}"/>
+  </target>
+
+  <target name="check-vdt" unless="env.VDT_LOCATION" depends="vdt">
+    <echo message="Warning: VDT_LOCATION not set. Ignore if GLOBUS was not installed wrom VDT."/> 
+  </target>
+
+  <target name="make-prepare" depends="init,check-vdt"
+          description="Sources Globus variables and prepares Makefile">
+
+    <fail unless="env.GLOBUS_LOCATION">
+      The GLOBUS_LOCATION environment variable must be set.
+    </fail>
+
+    <exec executable="bash">
+      <arg value="-c"/>
+      <arg value="source ${env.GLOBUS_LOCATION}/etc/globus-user-env.sh"/>
+    </exec>
+    <exec executable="bash">
+      <arg value="-c"/>
+      <arg value="source ${env.GLOBUS_LOCATION}/etc/globus-devel-env.sh"/>
+    </exec>
+
+    <echo message="Updating ${dist.dir}/Makefile"/>
+    <replaceregexp file="${dist.dir}/Makefile"
+                   byline="true" 
+                   match="GLOBUS_LOCATION=(.*)"
+                   replace="GLOBUS_LOCATION=${env.GLOBUS_LOCATION}"/>
+
+  </target> 
+  
+  <target name="make-prepare-no-init" depends="check-vdt"
+          description="Sources Globus variables and prepares Makefile">
+
+    <fail unless="env.GLOBUS_LOCATION">
+      The GLOBUS_LOCATION environment variable must be set.
+    </fail>
+
+    <exec executable="bash">
+      <arg value="-c"/>
+      <arg value="source ${env.GLOBUS_LOCATION}/etc/globus-user-env.sh"/>
+    </exec>
+    <exec executable="bash">
+      <arg value="-c"/>
+      <arg value="source ${env.GLOBUS_LOCATION}/etc/globus-devel-env.sh"/>
+    </exec>
+
+    <echo message="Updating ${dist.dir}/Makefile"/>
+    <replaceregexp file="${dist.dir}/Makefile"
+                   byline="true" 
+                   match="GLOBUS_LOCATION=(.*)"
+                   replace="GLOBUS_LOCATION=${env.GLOBUS_LOCATION}"/>
+
+  </target>
+
+  <target name="make-client-from-cvs" depends="make-prepare,java-jar"
+          description="Compiles the source code for client">
+    <!--mkdir dir="${dist.dir}/obj"/-->
+    <delete dir="${dist.dir}/obj"/>
+    <exec executable="${make}" dir="${dist.dir}">
+      <arg line="client"/>
+    </exec>
+
+    <!-- JNI compilation -->
+    <echo message="Compiling JNI with ${jni.compilesh} script"/>
+    <chmod file="${jni.compilesh}" perm="ugo+x"/>
+    <exec executable="${jni.compilesh}" dir="${jni.dir}">
+     <arg line=""/>
+    </exec>
+
+  </target>
+  
+  <target name="make-client" depends="make-prepare-no-init,java-jar-no-init"
+          description="Compiles the source code for client">
+    <!--mkdir dir="${dist.dir}/obj"/-->
+    <delete dir="${dist.dir}/obj"/>
+    <exec executable="${make}" dir="${dist.dir}">
+      <arg line="client"/>
+    </exec>
+
+    <!-- JNI compilation -->
+    <echo message="Compiling JNI with ${jni.compilesh} script"/>
+    <chmod file="${jni.compilesh}" perm="ugo+x"/>
+    <exec executable="${jni.compilesh}" dir="${jni.dir}">
+     <arg line=""/>
+    </exec>
+
+  </target>
+
+  <target name="make-storagenode" depends="make-client"
+          description="Compiles the source code for SE">
+    <delete dir="${dist.dir}/obj"/>
+    <exec executable="${make}" dir="${dist.dir}">
+      <arg line="storagenode"/>
+    </exec>
+  </target>
+
+	  <target name="make-storagenode-from-cvs" depends="make-client-from-cvs"
+	          description="Compiles the source code for SE">
+	    <delete dir="${dist.dir}/obj"/>
+	    <exec executable="${make}" dir="${dist.dir}">
+	      <arg line="storagenode"/>
+	    </exec>
+	  </target>
+	
+	<target name="make-server" depends="make-storagenode"
+	          description="Compiles the source code for server">
+
+	    <delete dir="${dist.dir}/obj"/>
+	    <exec executable="${make}" dir="${dist.dir}">
+	      <arg line="server"/>
+	    </exec>
+ 	</target>
+	
+  <target name="make-server-from-cvs" depends="make-storagenode-from-cvs"
+          description="Checks out and compiles the source code for server">
+
+    <delete dir="${dist.dir}/obj"/>
+    <exec executable="${make}" dir="${dist.dir}">
+      <arg line="server"/>
+    </exec>
+  </target>
+
+  <target name="make-clean" description="Cleans compiled objects">
+    <exec executable="${make}">
+      <arg line="clean"/>
+    </exec>
+  </target>
+
+  <target name="make-cleanall" description="Cleans all">
+    <exec executable="${make}">
+      <arg line="cleanall"/>
+    </exec>
+  </target>
+
+<!--
+============================================================================
+                         JAVA SOURCE CODE RELATED
+============================================================================
+-->
+
+  <target name="java-init" depends="init"
+          description="Creates a working directory for the compile and takes a copies of the source">
+    <delete dir="${workDir}"/>
+    <mkdir dir="${workDir}"/>
+    <mkdir dir="${src}"/>
+    <mkdir dir="${bin}"/>
+    <mkdir dir="${lib}" />
+    <copy todir="${src}">
+      <fileset dir="${java.dir}" includes="**/*.java"/>
+      <!--fileset dir="${java.dir}/org" includes="**/*.java"/>
+      <fileset dir="${java.dir}/uk" includes="**/*.java"/>
+      <fileset dir="${java.dir}/test" includes="**/*.java"/-->
+    </copy>
+  </target>
+
+  <target name="java-compile" depends="java-init"
+  description="Straight compiles of all classes"> 
+    <javac srcdir="${src}" destdir="${bin}" source="1.4" target="1.4">
+      <classpath refid="project.classpath"/>
+    </javac>
+  </target>
+
+  <target name="java-jar" depends="java-compile"
+          description="Jars all classes together">
+    <!--Can remove test/** from release-->
+    <jar destfile="${qcdgridjar}" basedir="${bin}" includes="uk/**"/>
+    <jar destfile="${qcdgridwsjar}" basedir="${bin}" includes="org/**"/>
+    <jar destfile="${qcdgridtestjar}" basedir="${bin}" includes="test/**"/>
+
+    <copy file="${qcdgridjar}" todir="${ildg-browser.dir}"/> 
+    <copy file="${qcdgridwsjar}" todir="${ildg-browser.dir}"/> 
+
+  </target>
+
+
+	  <target name="java-init-no-init"
+	          description="Creates a working directory for the compile and takes a copies of the source">
+	    <delete dir="${workDir}"/>
+	    <mkdir dir="${workDir}"/>
+	    <mkdir dir="${src}"/>
+	    <mkdir dir="${bin}"/>
+	    <mkdir dir="${lib}" />
+	    <copy todir="${src}">
+	      <fileset dir="${java.dir}" includes="**/*.java"/>
+	      <!--fileset dir="${java.dir}/org" includes="**/*.java"/>
+	      <fileset dir="${java.dir}/uk" includes="**/*.java"/>
+	      <fileset dir="${java.dir}/test" includes="**/*.java"/-->
+	    </copy>
+	  </target>
+
+	  <target name="java-compile-no-init" depends="java-init-no-init"
+	  description="Straight compiles of all classes"> 
+	    <javac srcdir="${src}" destdir="${bin}" source="1.4" target="1.4">
+	      <classpath refid="project.classpath"/>
+	    </javac>
+	  </target>
+
+	  <target name="java-jar-no-init" depends="java-compile-no-init"
+	          description="Jars all classes together">
+	    <!--Can remove test/** from release-->
+	    <jar destfile="${qcdgridjar}" basedir="${bin}" includes="uk/**"/>
+	    <jar destfile="${qcdgridwsjar}" basedir="${bin}" includes="org/**"/>
+	    <jar destfile="${qcdgridtestjar}" basedir="${bin}" includes="test/**"/>
+
+	    <copy file="${qcdgridjar}" todir="${ildg-browser.dir}"/> 
+	    <copy file="${qcdgridwsjar}" todir="${ildg-browser.dir}"/> 
+
+	  </target>
+
+<!--
+============================================================================
+                        DISTRIBUTION BUILDING RELATED
+============================================================================
+-->
+
+  <target name="dist-prepare" description="Prepares code for distribution">
+    <delete dir="${dist.dir}/obj"/>
+    <delete dir="${workDir}"/>
+
+    
+  <!-- delete all CVS dirs -->
+    <delete>
+      <fileset dir="${dist.dir}" includes="**/CVS"/>
+    </delete>
+
+   <!-- create COMPILE file -->
+   <delete file="${compile}"/>
+   <touch file="${compile}"/>
+   <echo message="Compiled on machine where 'uname -a' gives:${line.separator}" 
+         file="${compile}" append="true"/>
+   <exec executable="uname" output="${compile}" append="true">
+     <arg line="-a"/>
+   </exec>
+   <echo message="And 'gcc -v' gives:${line.separator}" 
+         file="${compile}" append="true"/>
+   <exec executable="gcc" output="${compile}" append="true">
+     <arg line="-v"/>
+   </exec>
+
+  </target> 
+
+  <target name="dist-source" depends="dist-prepare"
+          description="Generates source distribution">
+    <delete file="${compile}"/>
+    <antcall target="dist-targz">
+      <param name="tarname" value="digs-${version}-source"/>
+    </antcall>
+  </target>
+
+<target name="tarball" depends="prepare-code, createTarDir" 
+          description="Checks out code and archives distribution to *.tar.gz">
+	<tar destfile="${basedir}/digs-${version}-source.tar"  basedir="${basedir}/temp"/>
+	<gzip destfile="${basedir}/digs-${version}-source.tar.gz" src="${basedir}/digs-${version}-source.tar"/>
+    <delete file="${basedir}/digs-${version}-source.tar"/>
+	<delete dir="${dist.dir}"/>
+    <delete dir="${cvs.home}"/>
+  </target>
+
+<target name="createTarDir" description="create distribution dir structure">
+	<property name="temp.dir" location="${basedir}/temp/digs-${version}-source"/>
+	<delete dir="${basedir}/temp"/>
+		<move todir="${temp.dir}/digs-${version}">
+	    	<fileset dir="${dist.dir}"/>
+		</move>
+		<move file="${temp.dir}/digs-${version}/build.xml" todir="${temp.dir}"/>
+	</target>
+
+  <target name="dist-ildg-browser" depends="java-jar,dist-prepare"
+          description="Generates ildg-browser distribution">
+
+    <mkdir dir="${ildg-browser-dist}"/>
+    <mkdir dir="${ildg-browser-dist}/axis_jars"/>
+    <mkdir dir="${ildg-browser-dist}/exist_libraries"/>
+
+    <copy todir="${ildg-browser-dist}">
+      <fileset dir="${ildg-browser.dir}"/>
+    </copy>
+    <copy todir="${ildg-browser-dist}/axis_jars">
+      <fileset dir="${axis-libs.dir}"/>
+    </copy>
+    <copy todir="${ildg-browser-dist}/exist_libraries">
+      <fileset dir="${exist-libs.dir}"/>
+    </copy>
+
+    <antcall target="dist-targz">
+      <param name="tarname" value="ildg-browser-${ildg-browser-version}"/>
+    </antcall>
+  </target>
+
+  <target name="dist-client" depends="make-client,dist-prepare"
+          description="Generates binary client distribution">
+    <antcall target="dist-targz">
+      <param name="tarname" value="digs-${version}-linux-client"/>
+    </antcall>
+  </target>
+
+  <target name="dist-storagenode" depends="make-storagenode,dist-prepare"
+          description="Generates binary storage node distribution">
+    <antcall target="dist-targz">
+      <param name="tarname" value="digs-${version}-linux-storagenode"/>
+    </antcall>
+  </target>
+
+  <target name="dist-server" depends="make-server,dist-prepare"
+          description="Generates binary server distribution">
+    <antcall target="dist-targz">
+      <param name="tarname" value="digs-${version}-linux-server"/>
+    </antcall>
+  </target>
+
+  <target name="dist-targz" 
+          description="Archives distribution to *.tar.gz">
+<echo message="file = ${tarname}"/>
+    <tar tarfile="${basedir}/${tarname}.tar" basedir="${dist.dir}"/>
+    <gzip zipfile="${basedir}/${tarname}.tar.gz" src="${basedir}/${tarname}.tar"/>
+    <delete file="${basedir}/${tarname}.tar"/>
+  </target>
+
+  <target name="clean-dist" description="Deletes the whole distribution directory">
+    <delete dir="${dist.dir}"/>
+    <delete dir="${ildg-browser-dist}"/>
+  </target>
+
+</project>
